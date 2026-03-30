@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "files-cleanup": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["tsx", "/home/gabrielcmoris/learning/mcp-ia-learn/main.ts"]
+    }
+  }
+}

@@ -80,10 +80,13 @@ server.tool(
           { type: "text", text: duplicates.join("\n") },
         ],
       };
-    } catch (error) {
-      return { content: [{ type: "text", text: `Error scanning directory: ${error.message}` }] };
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        return { content: [{ type: "text", text: `Error scanning directory: ${error.message}` }] };
+      }
+      return { content: [{ type: "text", text: String(error) }] };
     }
-  }
+  },
 );
 
 function findDuplicateFiles(includeExtensions: string[] = COMMON_FILE_EXTENSIONS): string[] {
@@ -139,7 +142,7 @@ async function findUselessFiles(
   maxDepth = 5,
   startTime = Date.now(),
   maxFiles = 1000,
-  filesProcessed = 0
+  filesProcessed = 0,
 ): Promise<string[]> {
   const uselessFiles: string[] = [];
 
@@ -174,8 +177,11 @@ async function findUselessFiles(
   let items: string[];
   try {
     items = fs.readdirSync(dirPath);
-  } catch (error) {
-    return [`${dirPath} (error: ${error.message})`];
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return [`${dirPath} (error: ${error.message})`];
+    }
+    return [`${dirPath} (error: ${String(error)})`];
   }
 
   // Empty directory
@@ -234,8 +240,12 @@ async function findUselessFiles(
         uselessFiles.push(`${dirPath} (max files limit reached during processing)`);
         break;
       }
-    } catch (error) {
-      uselessFiles.push(`${itemPath} (error: ${error.message})`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        uselessFiles.push(`${itemPath} (error: ${error.message})`);
+      } else {
+        uselessFiles.push(`${itemPath} (error: ${String(error)})`);
+      }
     }
   }
 
