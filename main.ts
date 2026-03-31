@@ -39,13 +39,19 @@ const COMMON_FILE_EXTENSIONS = [
   "pptx",
 ];
 
+const SAFE_TO_DELETE_IF_EMPTY = [".next", "dist", "build", "coverage", "out", "tmp", "temp"];
+
 const server = new McpServer({
   name: "files-cleanup",
-  version: "1.0.0",
+  version: "1.1.0",
 });
 
 // Store file hashes to detect duplicates
 const fileHashes: Map<string, string[]> = new Map();
+
+function isSafeToDelete(dirName: string): boolean {
+  return SAFE_TO_DELETE_IF_EMPTY.includes(dirName);
+}
 
 server.tool(
   "find-useless-files",
@@ -185,7 +191,7 @@ async function findUselessFiles(
   }
 
   // Empty directory
-  if (items.length === 0) {
+  if (items.length === 0 && isSafeToDelete(path.basename(dirPath))) {
     uselessFiles.push(`${dirPath} (empty directory)`);
     return uselessFiles;
   }
