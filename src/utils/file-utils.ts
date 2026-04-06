@@ -5,7 +5,7 @@ import path from "path";
 import { formatBytes } from "./format-utils";
 import { fileHashes } from "../main";
 
-// TODO: Check this fucntions, it seems they are logging things that shouldnt
+// TODO: Check this fucntions, something is wrong. Files that shouldn't be logged are logged.
 
 export async function calculateFileHash(itemPath: string): Promise<string> {
   const stats = fs.lstatSync(itemPath);
