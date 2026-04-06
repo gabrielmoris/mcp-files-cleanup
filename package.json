@@ -5,8 +5,8 @@
   "main": "main.ts",
   "type": "module",
   "scripts": {
-    "start": "npx tsx main.ts",
-    "inspector": "npx -y @modelcontextprotocol/inspector npx -y tsx main.ts"
+    "start": "npx tsx src/main.ts",
+    "inspector": "npx -y @modelcontextprotocol/inspector npx -y tsx src/main.ts"
   },
   "keywords": [],
   "author": "",

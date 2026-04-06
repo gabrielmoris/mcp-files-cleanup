@@ -1,162 +1,11 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
-import path from "path";
+import { COMMON_FILE_EXTENSIONS, MAX_EXECUTION_TIME_MS, MAX_ITEMS_PER_DIR, SAFE_TO_DELETE_IF_EMPTY } from "./constants";
 import fs from "node:fs";
 import crypto from "crypto";
+import path from "path";
+import { formatBytes } from "./format-utils";
+import { fileHashes } from "../main";
 
-const MAX_FILES_TO_PROCESS = 1000;
-const MAX_EXECUTION_TIME_MS = 5000;
-const MAX_DEPTH = 10;
-const MAX_ITEMS_PER_DIR = 100;
-const COMMON_FILE_EXTENSIONS = [
-  "txt",
-  "js",
-  "html",
-  "css",
-  "json",
-  "xml",
-  "md",
-  "pdf",
-  "jpg",
-  "jpeg",
-  "png",
-  "gif",
-  "bmp",
-  "svg",
-  "mp3",
-  "wav",
-  "ogg",
-  "flac",
-  "mp4",
-  "avi",
-  "mkv",
-  "doc",
-  "docx",
-  "xls",
-  "xlsx",
-  "ppt",
-  "pptx",
-];
-
-const SAFE_TO_DELETE_IF_EMPTY = [".next", "dist", "build", "coverage", "out", "tmp", "temp"];
-
-const server = new McpServer({
-  name: "files-cleanup",
-  version: "1.1.1",
-});
-
-// Store file hashes to detect duplicates
-const fileHashes: Map<string, string[]> = new Map();
-
-// MCP server
-
-server.tool(
-  "find-useless-files",
-  "Find useless files in a directory",
-  {
-    directory: z.string().describe("The directory to search"),
-    maxDepth: z.number().default(5).describe("Maximum directory depth to search, max value is 10"),
-    maxFiles: z.number().default(1000).describe("Maximum number of files to process"),
-  },
-  async ({ directory, maxDepth, maxFiles }) => {
-    try {
-      // Clear previous results
-      fileHashes.clear();
-
-      // Set limits
-      const startTime = Date.now();
-      let filesProcessed = 0;
-      let totalSize = 0;
-
-      const actualMaxDepth = Math.min(maxDepth, MAX_DEPTH);
-      const actualMaxFiles = Math.min(maxFiles, MAX_FILES_TO_PROCESS);
-
-      const result = await findUselessFiles(directory, 0, actualMaxDepth, startTime, actualMaxFiles, filesProcessed);
-      const uselessFiles = result.items;
-      totalSize = result.totalSize;
-
-      const duplicates = findDuplicateFiles(COMMON_FILE_EXTENSIONS);
-      if (uselessFiles.length === 0 && duplicates.length === 0) {
-        return { content: [{ type: "text", text: `No useless files found in: ${directory}` }] };
-      }
-
-      return {
-        content: [
-          { type: "text", text: `Found ${uselessFiles.length} potentially useless files/directories in: ${directory}` },
-          { type: "text", text: `💾 Total size: ${formatBytes(totalSize)}` },
-          { type: "text", text: uselessFiles.join("\n") },
-          { type: "text", text: `Found ${duplicates.length} duplicate files in: ${directory}` },
-          { type: "text", text: duplicates.join("\n") },
-        ],
-      };
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        return { content: [{ type: "text", text: `Error scanning directory: ${error.message}` }] };
-      }
-      return { content: [{ type: "text", text: String(error) }] };
-    }
-  },
-);
-
-// Functions. TODO: Separate this  in a new file
-
-function isSafeToDelete(dirName: string): boolean {
-  return SAFE_TO_DELETE_IF_EMPTY.includes(dirName);
-}
-
-function getDirectorySize(dirPath: string): number {
-  let size = 0;
-  try {
-    const items = fs.readdirSync(dirPath);
-    for (const item of items) {
-      const itemPath = path.join(dirPath, item);
-      const stats = fs.lstatSync(itemPath);
-      if (stats.isDirectory()) {
-        size += getDirectorySize(itemPath);
-      } else {
-        size += stats.size;
-      }
-    }
-  } catch {
-    // Error
-    return -1;
-  }
-  return size;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-}
-
-function findDuplicateFiles(includeExtensions: string[] = COMMON_FILE_EXTENSIONS): string[] {
-  const duplicates: string[] = [];
-
-  fileHashes.forEach((filePaths) => {
-    if (filePaths.length > 1) {
-      const original = filePaths[0];
-      const dupes = filePaths.slice(1);
-
-      dupes.forEach((dupe) => {
-        const originalExtension = path.extname(original).slice(1).toLowerCase();
-        const dupeExtension = path.extname(dupe).slice(1).toLowerCase();
-
-        // Check if extensions should be included
-        if (includeExtensions.length === 0 || (includeExtensions.includes(originalExtension) && includeExtensions.includes(dupeExtension))) {
-          duplicates.push(`${dupe} (duplicate of ${original})`);
-        }
-      });
-    }
-  });
-
-  return duplicates;
-}
-
-async function calculateFileHash(itemPath: string): Promise<string> {
+export async function calculateFileHash(itemPath: string): Promise<string> {
   const stats = fs.lstatSync(itemPath);
   if (!stats.isFile()) {
     return ""; // Return empty string for non-files.
@@ -180,7 +29,54 @@ async function calculateFileHash(itemPath: string): Promise<string> {
   });
 }
 
-async function findUselessFiles(
+export function findDuplicateFiles(includeExtensions: string[] = COMMON_FILE_EXTENSIONS): string[] {
+  const duplicates: string[] = [];
+
+  fileHashes.forEach((filePaths) => {
+    if (filePaths.length > 1) {
+      const original = filePaths[0];
+      const dupes = filePaths.slice(1);
+
+      dupes.forEach((dupe) => {
+        const originalExtension = path.extname(original).slice(1).toLowerCase();
+        const dupeExtension = path.extname(dupe).slice(1).toLowerCase();
+
+        // Check if extensions should be included
+        if (includeExtensions.length === 0 || (includeExtensions.includes(originalExtension) && includeExtensions.includes(dupeExtension))) {
+          duplicates.push(`${dupe} (duplicate of ${original})`);
+        }
+      });
+    }
+  });
+
+  return duplicates;
+}
+
+export function isSafeToDelete(dirName: string): boolean {
+  return SAFE_TO_DELETE_IF_EMPTY.includes(dirName);
+}
+
+export function getDirectorySize(dirPath: string): number {
+  let size = 0;
+  try {
+    const items = fs.readdirSync(dirPath);
+    for (const item of items) {
+      const itemPath = path.join(dirPath, item);
+      const stats = fs.lstatSync(itemPath);
+      if (stats.isDirectory()) {
+        size += getDirectorySize(itemPath);
+      } else {
+        size += stats.size;
+      }
+    }
+  } catch {
+    // Error
+    return -1;
+  }
+  return size;
+}
+
+export async function findUselessFiles(
   dirPath: string,
   currentDepth = 0,
   maxDepth = 5,
@@ -302,6 +198,3 @@ async function findUselessFiles(
 
   return { items: uselessFiles, totalSize };
 }
-
-const transport = new StdioServerTransport();
-await server.connect(transport);
