@@ -5,6 +5,8 @@ import path from "path";
 import { formatBytes } from "./format-utils";
 import { fileHashes } from "../main";
 
+// TODO: Check this fucntions, it seems they are logging things that shouldnt
+
 export async function calculateFileHash(itemPath: string): Promise<string> {
   const stats = fs.lstatSync(itemPath);
   if (!stats.isFile()) {
@@ -105,7 +107,6 @@ export async function findUselessFiles(
 
   // Prevent excessive recursion
   if (currentDepth > maxDepth) {
-    uselessFiles.push(`${dirPath} (max depth reached)`);
     return { items: uselessFiles, totalSize };
   }
 
