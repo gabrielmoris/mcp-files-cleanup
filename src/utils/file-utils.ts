@@ -17,7 +17,7 @@ export async function calculateFileHash(itemPath: string): Promise<string> {
     const hash = crypto.createHash("md5");
     const fileStream = fs.createReadStream(itemPath);
 
-    fileStream.on("data", (chunk) => {
+    fileStream.on("data", (chunk: any) => {
       hash.update(chunk);
     });
 
@@ -25,8 +25,8 @@ export async function calculateFileHash(itemPath: string): Promise<string> {
       resolve(hash.digest("hex"));
     });
 
-    fileStream.on("error", (err) => {
-      reject(err);
+    fileStream.on("error", (error: unknown) => {
+      reject(error);
     });
   });
 }
@@ -95,13 +95,11 @@ export async function findUselessFiles(
 
   // Check time limit
   if (Date.now() - startTime > MAX_EXECUTION_TIME_MS) {
-    uselessFiles.push(`${dirPath} (execution time limit reached)`);
     return { items: uselessFiles, totalSize };
   }
 
   // Check file count limit
   if (filesProcessed >= maxFiles) {
-    uselessFiles.push(`${dirPath} (max files limit reached)`);
     return { items: uselessFiles, totalSize };
   }
 
@@ -135,7 +133,7 @@ export async function findUselessFiles(
   const itemsToProcess = items.slice(0, MAX_ITEMS_PER_DIR);
 
   if (items.length > MAX_ITEMS_PER_DIR) {
-    uselessFiles.push(`${dirPath} (limited scan: ${MAX_ITEMS_PER_DIR}/${items.length} items)`);
+    return { items: [], totalSize: 0 };
   }
 
   for (const item of itemsToProcess) {
@@ -189,11 +187,7 @@ export async function findUselessFiles(
         break;
       }
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        uselessFiles.push(`${itemPath} (error: ${error.message})`);
-      } else {
-        uselessFiles.push(`${itemPath} (error: ${String(error)})`);
-      }
+      return { items: [], totalSize: 0 };
     }
   }
 

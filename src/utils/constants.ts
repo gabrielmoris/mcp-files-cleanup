@@ -32,4 +32,4 @@ export const COMMON_FILE_EXTENSIONS = [
   "pptx",
 ];
 
-export const SAFE_TO_DELETE_IF_EMPTY = [".next", "dist", "build", "coverage", "out", "tmp", "temp"];
+export const SAFE_TO_DELETE_IF_EMPTY = [".next", "dist", "tmp", "temp", "node_modules"];
