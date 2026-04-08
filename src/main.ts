@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { COMMON_FILE_EXTENSIONS, MAX_DEPTH, MAX_FILES_TO_PROCESS } from "./utils/constants";
-import { findDuplicateFiles, findUselessFiles } from "./utils/file-utils";
+import { deleteFilesAndLogDeletions, findDuplicateFiles, findUselessFiles } from "./utils/file-utils";
 import { formatBytes } from "./utils/format-utils";
 
 export const server = new McpServer({
@@ -12,6 +12,8 @@ export const server = new McpServer({
 
 // Find useless files
 export const fileHashes: Map<string, string[]> = new Map();
+
+// TODO: Separate the file path and the reason in a object instead of making a string
 
 server.tool(
   "find-useless-files",
@@ -40,23 +42,62 @@ server.tool(
 
       const duplicates = findDuplicateFiles(COMMON_FILE_EXTENSIONS);
       if (uselessFiles.length === 0 && duplicates.length === 0) {
-        return { content: [{ type: "text", text: `No useless files found in: ${directory}` }] };
+        throw new Error(`No useless files found in: ${directory}`);
       }
 
       return {
         content: [
-          { type: "text", text: `Found ${uselessFiles.length} potentially useless files/directories in: ${directory}` },
-          { type: "text", text: `💾 Total size: ${formatBytes(totalSize)}` },
-          { type: "text", text: uselessFiles.join("\n") },
+          {
+            type: "text",
+            text: `Found ${uselessFiles.length} potentially useless files/directories in: ${directory}.`,
+          },
           { type: "text", text: `Found ${duplicates.length} duplicate files in: ${directory}` },
-          { type: "text", text: duplicates.join("\n") },
+          { type: "text", text: `💾 Total size: ${formatBytes(totalSize)}` },
+        ],
+        structuredContent: {
+          duplicates,
+          uselessFiles,
+        },
+      };
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        throw new Error(`Error scanning directory: ${error.message}`);
+      }
+      throw new Error(String(error));
+    }
+  },
+);
+
+server.tool(
+  "delete-files",
+  "Delete array of files",
+  {
+    directories: z.string().array().describe("Array of directories to delete"),
+  },
+  async ({ directories }) => {
+    try {
+      // Clear previous results
+      fileHashes.clear();
+
+      if (directories.length === 0) {
+        throw new Error(`Nothing to delete`);
+      }
+
+      const { numberOfDeletions } = deleteFilesAndLogDeletions(directories);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Deleted ${numberOfDeletions} files. ${directories.length - numberOfDeletions} files copuldn't be deleted ${typeof directories} ${directories})}`,
+          },
         ],
       };
     } catch (error: unknown) {
       if (error instanceof Error) {
-        return { content: [{ type: "text", text: `Error scanning directory: ${error.message}` }] };
+        throw new Error(`Error deleting directories: ${error.message}`);
       }
-      return { content: [{ type: "text", text: String(error) }] };
+      throw new Error(String(error));
     }
   },
 );

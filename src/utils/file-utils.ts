@@ -175,15 +175,12 @@ export async function findUselessFiles(
         }
       }
 
-      // Check time limit again
+      // Check time limit and file count limit again
       if (Date.now() - startTime > MAX_EXECUTION_TIME_MS) {
-        uselessFiles.push(`${dirPath} (execution time limit reached during processing)`);
         break;
       }
 
-      // Check file count limit again
       if (filesProcessed >= maxFiles) {
-        uselessFiles.push(`${dirPath} (max files limit reached during processing)`);
         break;
       }
     } catch (error: unknown) {
@@ -193,3 +190,14 @@ export async function findUselessFiles(
 
   return { items: uselessFiles, totalSize };
 }
+
+export const deleteFilesAndLogDeletions = (files: string[]) => {
+  let numberOfDeletions = 0;
+
+  //TODO: Iterate over directories and delete them one by one
+  // 1. Check input type
+  // 2. iterate over it and add the number of deletions
+  // 3. delete the files
+
+  return { numberOfDeletions };
+};
