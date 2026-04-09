@@ -5,6 +5,11 @@ import path from "path";
 import { formatBytes } from "./format-utils";
 import { fileHashes } from "../main";
 
+export interface FileOutput {
+  path: string;
+  reason: string;
+}
+
 // TODO: Check this fucntions, something is wrong. Files that shouldn't be logged are logged.
 
 export async function calculateFileHash(itemPath: string): Promise<string> {
@@ -31,8 +36,8 @@ export async function calculateFileHash(itemPath: string): Promise<string> {
   });
 }
 
-export function findDuplicateFiles(includeExtensions: string[] = COMMON_FILE_EXTENSIONS): string[] {
-  const duplicates: string[] = [];
+export function findDuplicateFiles(includeExtensions: string[] = COMMON_FILE_EXTENSIONS): FileOutput[] {
+  const duplicates: FileOutput[] = [];
 
   fileHashes.forEach((filePaths) => {
     if (filePaths.length > 1) {
@@ -40,12 +45,12 @@ export function findDuplicateFiles(includeExtensions: string[] = COMMON_FILE_EXT
       const dupes = filePaths.slice(1);
 
       dupes.forEach((dupe) => {
-        const originalExtension = path.extname(original).slice(1).toLowerCase();
-        const dupeExtension = path.extname(dupe).slice(1).toLowerCase();
+        const originalExtension = path.extname(original).slice(1);
+        const dupeExtension = path.extname(dupe).slice(1);
 
         // Check if extensions should be included
         if (includeExtensions.length === 0 || (includeExtensions.includes(originalExtension) && includeExtensions.includes(dupeExtension))) {
-          duplicates.push(`${dupe} (duplicate of ${original})`);
+          duplicates.push({ path: dupe, reason: `Duplicate of ${original}` });
         }
       });
     }
@@ -85,8 +90,8 @@ export async function findUselessFiles(
   startTime = Date.now(),
   maxFiles = 1000,
   filesProcessed = 0,
-): Promise<{ items: string[]; totalSize: number }> {
-  const uselessFiles: string[] = [];
+): Promise<{ items: FileOutput[]; totalSize: number }> {
+  const uselessFiles: FileOutput[] = [];
   let totalSize = 0;
 
   if (dirPath.includes("node_modules") || dirPath.includes(".git")) {
@@ -119,14 +124,14 @@ export async function findUselessFiles(
     items = fs.readdirSync(dirPath);
   } catch (error: unknown) {
     if (error instanceof Error) {
-      return { items: [`${dirPath} (error: ${error.message})`], totalSize: 0 };
+      return { items: [{ path: dirPath, reason: `error: ${error.message}` }], totalSize: 0 };
     }
-    return { items: [`${dirPath} (error: ${String(error)})`], totalSize: 0 };
+    return { items: [{ path: dirPath, reason: `error: ${String(error)}` }], totalSize: 0 };
   }
 
   // Empty directory
   if (items.length === 0 && isSafeToDelete(path.basename(dirPath))) {
-    uselessFiles.push(`${dirPath} (empty directory)`);
+    uselessFiles.push({ path: dirPath, reason: `Empty directory` });
   }
 
   // Process only a limited number of items per directory
@@ -149,7 +154,7 @@ export async function findUselessFiles(
         if (isSafeToDelete(dirName)) {
           const dirSize = getDirectorySize(itemPath);
           totalSize += dirSize;
-          uselessFiles.push(`${itemPath} (build artifact: ${formatBytes(dirSize)})`);
+          uselessFiles.push({ path: itemPath, reason: `Build artifact: ${formatBytes(dirSize)}` });
           continue;
         }
 
@@ -158,7 +163,7 @@ export async function findUselessFiles(
         totalSize += subDirResults.totalSize;
       } else {
         if (stats.size === 0) {
-          uselessFiles.push(`${itemPath} (empty file)`);
+          uselessFiles.push({ path: dirPath, reason: `Empty file` });
         }
 
         const fileExtension = path.extname(itemPath).slice(1).toLowerCase();
