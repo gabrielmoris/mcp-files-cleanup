@@ -78,7 +78,7 @@ export function getDirectorySize(dirPath: string): number {
     }
   } catch {
     // Error
-    return -1;
+    return 0;
   }
   return size;
 }
@@ -163,7 +163,7 @@ export async function findUselessFiles(
         totalSize += subDirResults.totalSize;
       } else {
         if (stats.size === 0) {
-          uselessFiles.push({ path: dirPath, reason: `Empty file` });
+          uselessFiles.push({ path: itemPath, reason: `Empty file` });
         }
 
         const fileExtension = path.extname(itemPath).slice(1).toLowerCase();
