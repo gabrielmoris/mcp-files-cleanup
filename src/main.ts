@@ -13,8 +13,6 @@ export const server = new McpServer({
 // Find useless files
 export const fileHashes: Map<string, string[]> = new Map();
 
-// TODO: Separate the file path and the reason in a object instead of making a string
-
 server.tool(
   "find-useless-files",
   "Find useless files in a directory",

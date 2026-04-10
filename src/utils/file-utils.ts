@@ -11,6 +11,15 @@ export interface FileOutput {
 }
 
 // TODO: Check this fucntions, something is wrong. Files that shouldn't be logged are logged.
+// 76:
+// {
+// path:
+// "/lost+found"
+
+// reason:
+// "error: EACCES: permission denied, scandir '/lost+found'"
+
+// }
 
 export async function calculateFileHash(itemPath: string): Promise<string> {
   const stats = fs.lstatSync(itemPath);
@@ -123,10 +132,7 @@ export async function findUselessFiles(
   try {
     items = fs.readdirSync(dirPath);
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      return { items: [{ path: dirPath, reason: `error: ${error.message}` }], totalSize: 0 };
-    }
-    return { items: [{ path: dirPath, reason: `error: ${String(error)}` }], totalSize: 0 };
+    return { items: uselessFiles, totalSize };
   }
 
   // Empty directory
@@ -138,7 +144,7 @@ export async function findUselessFiles(
   const itemsToProcess = items.slice(0, MAX_ITEMS_PER_DIR);
 
   if (items.length > MAX_ITEMS_PER_DIR) {
-    return { items: [], totalSize: 0 };
+    return { items: uselessFiles, totalSize };
   }
 
   for (const item of itemsToProcess) {
@@ -189,7 +195,7 @@ export async function findUselessFiles(
         break;
       }
     } catch (error: unknown) {
-      return { items: [], totalSize: 0 };
+      return { items: uselessFiles, totalSize };
     }
   }
 
